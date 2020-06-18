@@ -100,26 +100,38 @@ alias SSBendl "con_filter_enable 2"
         if (lineWords.length + word.length > MAX_LINE_LENGTH) {
           break;
         }
+        // If the word contains a newline, create a hard break
+        if (word.includes("\n")) {
+          lineWords += word.substr(0, word.indexOf("\n"));
+          word = words[i] = words[i].substr(word.indexOf("\n") + 1);
+          break;
+        }
         lineWords += word;
         // Split into multiple lines if periods are used and there is a line to go. Try to combine sentences if possible according to line length
-        if (i + 1 < words.length && word[word.length - 1] === ".") {
-          let nextPeriodLength = 0;
-          for (
-            let iPeriod = i;
-            iPeriod < words.length && nextPeriodLength <= MAX_LINE_LENGTH;
-            iPeriod += 1
-          ) {
-            const iPeriodWord = words[iPeriod];
-            // Add 1 for space
-            if (nextPeriodLength > 0) nextPeriodLength += 1;
-            nextPeriodLength += iPeriodWord.length;
-            // Next period found, done
-            if (iPeriodWord[iPeriodWord.length - 1] === ".") {
+        if (i + 1 < words.length) {
+          // Always send a new message for newlines
+          if (word[word.length - 1] === "\n") {
+            break;
+          }
+          if (word[word.length - 1] === ".") {
+            let nextPeriodLength = 0;
+            for (
+              let iPeriod = i;
+              iPeriod < words.length && nextPeriodLength <= MAX_LINE_LENGTH;
+              iPeriod += 1
+            ) {
+              const iPeriodWord = words[iPeriod];
+              // Add 1 for space
+              if (nextPeriodLength > 0) nextPeriodLength += 1;
+              nextPeriodLength += iPeriodWord.length;
+              // Next period found, done
+              if (iPeriodWord[iPeriodWord.length - 1] === ".") {
+                break;
+              }
+            }
+            if (nextPeriodLength + lineWords.length > MAX_LINE_LENGTH) {
               break;
             }
-          }
-          if (nextPeriodLength + lineWords.length > MAX_LINE_LENGTH) {
-            break;
           }
         }
       }
@@ -201,7 +213,11 @@ alias SSBendl "con_filter_enable 2"
     alias(`-SSBsay_${digits}`, ``);
     alias(
       `SSBhelp_${digits}`,
-      echo(`[${digits}]${lineCount > 1 ? ` {${lineCount} lines}` : ""} ${text}`)
+      echo(
+        `[${digits}]${
+          lineCount > 1 ? ` {${lineCount} lines}` : ""
+        } ${text.replace(/\n/g, " ")}`
+      )
     );
   }
 
