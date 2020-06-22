@@ -3,7 +3,10 @@ import { promises as fs } from "fs";
 // Maximum amount of chars per chat message (dictated by Source)
 const MAX_LINE_LENGTH = 127;
 // Wait length when `say`ing multiple lines
-const WAIT_LENGTH_NEWLINE = 300;
+const WAIT_LENGTH_NEWLINE = 250;
+// Source has a command text length limit of 512
+const MAX_COMMANDS_PER_LINE = 3;
+const MAX_COMMAND_LENGTH = 512;
 const DIGIT_KEY_MAP = {
   0: "KP_INS",
   1: "KP_END",
@@ -41,12 +44,18 @@ alias SSBendl "con_filter_enable 2"
   }
 
   function alias(token, command) {
+    if (command.length > MAX_COMMAND_LENGTH) {
+      throw new Error(`Line ${command} exceeds Source's max command length`);
+    }
     line(`alias ${token} ${wrapCommand(command)}`);
   }
   /**
    * @param {string} command Must be a single command (use an alias if you need multiple commands)
    */
   function bind(key, command) {
+    if (command.length > MAX_COMMAND_LENGTH) {
+      throw new Error(`Line ${command} exceeds Source's max command length`);
+    }
     return `bind ${DIGIT_KEY_MAP[key]} ${command};`;
   }
 
@@ -60,15 +69,18 @@ alias SSBendl "con_filter_enable 2"
   }
 
   function echo(line) {
-    return `echo ${CONSOLE_PREFIX}${sanitizeLine(line)};`;
+    const sanitized = sanitizeLine(line);
+    return `echo ${CONSOLE_PREFIX}${sanitized.substr(0, 200)}${
+      sanitized.length > 200 ? `... (+${sanitized.length - 200} chrs)` : ""
+    }`;
   }
 
   function echowrap(text) {
-    return `${text}SSBendl;`;
+    return `${text};SSBendl;`;
   }
 
   function help(digits) {
-    return echowrap(`${digits.map((d) => `SSBhelp_${d};`).join("")}`);
+    return echowrap(`${digits.map((d) => `SSBhelp_${d}`).join(";")}`);
   }
 
   function reset() {
@@ -77,9 +89,11 @@ alias SSBendl "con_filter_enable 2"
 
   function say(line) {
     const text = sanitizeLine(line);
+    const messages = [];
     let message = `${reset()}`;
     const words = text.split(" ");
     let i = 0;
+    let currentLines = 0;
     while (i < words.length) {
       if (i !== 0) {
         message += `wait ${WAIT_LENGTH_NEWLINE};`;
@@ -140,8 +154,15 @@ alias SSBendl "con_filter_enable 2"
         break;
       }
       message += `say ${lineWords};`;
+      currentLines += 1;
+      if (currentLines >= MAX_COMMANDS_PER_LINE) {
+        currentLines = 0;
+        messages.push(message);
+        message = "";
+      }
     }
-    return message;
+    if (message.length) messages.push(message);
+    return messages;
   }
 
   function notfound(digits) {
@@ -208,8 +229,20 @@ alias SSBendl "con_filter_enable 2"
   function sound(text, path) {
     const digits = path.join("");
     const saycode = say(text);
-    const lineCount = saycode.split(";wait").length;
-    alias(`+SSBsay_${digits}`, saycode);
+    const lineCount = saycode.join("").split(";wait").length;
+    if (saycode.length === 1) {
+      alias(`+SSBsay_${digits}`, saycode[0]);
+    } else {
+      for (let i = 0; i < saycode.length; i += 1) {
+        alias(
+          `ssbs_${digits}_${i}`,
+          saycode[i] +
+            // Call the next fn (if it will be defined)
+            `${i === saycode.length - 1 ? "" : `ssbs_${digits}_${i + 1}`}`
+        );
+      }
+      alias(`+SSBsay_${digits}`, `ssbs_${digits}_0`);
+    }
     alias(`-SSBsay_${digits}`, ``);
     alias(
       `SSBhelp_${digits}`,
@@ -230,7 +263,7 @@ alias SSBendl "con_filter_enable 2"
     if (command[command.length - 1] === ";") {
       command = command.substr(0, command.length - 1);
     }
-    if (command.includes(" ") || command.split(";").length > 2) {
+    if (command.includes(" ") || command.includes(";")) {
       return '"' + command + '"';
     }
     return command;
