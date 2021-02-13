@@ -2,8 +2,8 @@
   "name": "source-soundboard",
   "version": "1.0.0",
   "description": "Create Source engine .cfg files that say a message in chat (\"bind\") after entering their numeric code on your numpad",
-  "main": "index.js",
-  "bin": "index.js",
+  "main": "./index.js",
+  "bin": "./index.js",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/caresx/source-soundboard.git"
