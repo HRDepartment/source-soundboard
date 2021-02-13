@@ -1,0 +1,7 @@
+package-lock.json
+.prettierrc
+.gitignore
+.editorconfig
+.eslintrc.json
+bench/
+test/

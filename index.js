@@ -1,29 +1,38 @@
-import { promises as fs } from "fs";
+#!/usr/bin/env node
+import { promises as fs } from 'fs';
+import path from 'path';
 
 // Maximum amount of chars per chat message (dictated by Source)
 const MAX_LINE_LENGTH = 127;
-// Wait length when `say`ing multiple lines
-const WAIT_LENGTH_NEWLINE = 250;
+// Wait duration in game ticks when `say`ing multiple lines
+const GAME_WAIT = { tf2: 250 };
+const GAME_WAIT_DEFAULT = 100;
 // Source has a command text length limit of 512
 const MAX_COMMANDS_PER_LINE = 3;
 const MAX_COMMAND_LENGTH = 512;
 const DIGIT_KEY_MAP = {
-  0: "KP_INS",
-  1: "KP_END",
-  2: "KP_DOWNARROW",
-  3: "KP_PGDN",
-  4: "KP_LEFTARROW",
-  5: "KP_5",
-  6: "KP_RIGHTARROW",
-  7: "KP_HOME",
-  8: "KP_UPARROW",
-  9: "KP_PGUP",
+  0: 'KP_INS',
+  1: 'KP_END',
+  2: 'KP_DOWNARROW',
+  3: 'KP_PGDN',
+  4: 'KP_LEFTARROW',
+  5: 'KP_5',
+  6: 'KP_RIGHTARROW',
+  7: 'KP_HOME',
+  8: 'KP_UPARROW',
+  9: 'KP_PGUP',
 };
 // Press 0 to reset soundboard
+// Valid keys in the hierarchy of a soundboard file
 const DIGITS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+// Valid top-level keys in a soundboard file
+const TOP_LEVEL_KEYS = [...DIGITS.map(String), 'wait'];
 
 function soundboard(sb) {
-  const CONSOLE_PREFIX = "";
+  const waitLengthNewline = GAME_WAIT.hasOwnProperty(sb.wait)
+    ? GAME_WAIT[sb.wait]
+    : Number.parseInt(sb.wait) || GAME_WAIT_DEFAULT;
+  const CONSOLE_PREFIX = '';
   let output = `developer 1
 con_filter_enable 2
 con_filter_text "*****"
@@ -65,13 +74,13 @@ alias SSBendl "con_filter_enable 2"
         const digits = String(pathDigit);
         return bind(digits.substr(digits.length - 1), `+SSBsay_${digits}`);
       })
-      .join("");
+      .join('');
   }
 
   function echo(line) {
     const sanitized = sanitizeLine(line);
     return `echo ${CONSOLE_PREFIX}${sanitized.substr(0, 200)}${
-      sanitized.length > 200 ? `... (+${sanitized.length - 200} chrs)` : ""
+      sanitized.length > 200 ? `... (+${sanitized.length - 200} chrs)` : ''
     }`;
   }
 
@@ -80,7 +89,7 @@ alias SSBendl "con_filter_enable 2"
   }
 
   function help(digits) {
-    return echowrap(`${digits.map((d) => `SSBhelp_${d}`).join(";")}`);
+    return echowrap(`${digits.map((d) => `SSBhelp_${d}`).join(';')}`);
   }
 
   function reset() {
@@ -91,14 +100,14 @@ alias SSBendl "con_filter_enable 2"
     const text = sanitizeLine(line);
     const messages = [];
     let message = `${reset()}`;
-    const words = text.split(" ");
+    const words = text.split(' ');
     let i = 0;
     let currentLines = 0;
     while (i < words.length) {
       if (i !== 0) {
-        message += `wait ${WAIT_LENGTH_NEWLINE};`;
+        message += `wait ${waitLengthNewline};`;
       }
-      let lineWords = "";
+      let lineWords = '';
       for (; i < words.length; i += 1) {
         let word = words[i];
         // If the line is a single word (no spaces), try to cut into that word
@@ -109,25 +118,26 @@ alias SSBendl "con_filter_enable 2"
           break;
         }
         // Re-add space (removed by split)
-        if (lineWords.length) lineWords += " ";
+        if (lineWords.length) lineWords += ' ';
         // emit say
         if (lineWords.length + word.length > MAX_LINE_LENGTH) {
           break;
         }
         // If the word contains a newline, create a hard break
-        if (word.includes("\n")) {
-          lineWords += word.substr(0, word.indexOf("\n"));
-          word = words[i] = words[i].substr(word.indexOf("\n") + 1);
+        if (word.includes('\n')) {
+          lineWords += word.substr(0, word.indexOf('\n'));
+          word = words[i] = words[i].substr(word.indexOf('\n') + 1);
           break;
         }
         lineWords += word;
         // Split into multiple lines if periods are used and there is a line to go. Try to combine sentences if possible according to line length
         if (i + 1 < words.length) {
+          const lastWord = word[word.length - 1];
           // Always send a new message for newlines
-          if (word[word.length - 1] === "\n") {
+          if (lastWord === '\n') {
             break;
           }
-          if (word[word.length - 1] === ".") {
+          if (lastWord === '.') {
             let nextPeriodLength = 0;
             for (
               let iPeriod = i;
@@ -139,7 +149,7 @@ alias SSBendl "con_filter_enable 2"
               if (nextPeriodLength > 0) nextPeriodLength += 1;
               nextPeriodLength += iPeriodWord.length;
               // Next period found, done
-              if (iPeriodWord[iPeriodWord.length - 1] === ".") {
+              if (iPeriodWord[iPeriodWord.length - 1] === '.') {
                 break;
               }
             }
@@ -158,7 +168,7 @@ alias SSBendl "con_filter_enable 2"
       if (currentLines >= MAX_COMMANDS_PER_LINE) {
         currentLines = 0;
         messages.push(message);
-        message = "";
+        message = '';
       }
     }
     if (message.length) messages.push(message);
@@ -170,7 +180,7 @@ alias SSBendl "con_filter_enable 2"
   }
 
   function traverse(board, path) {
-    const boardPath = path.join("");
+    const boardPath = path.join('');
     // Only digits assigned a `say`
     const boardDigits = [];
     // All digits, even `notfound` ones.
@@ -178,16 +188,14 @@ alias SSBendl "con_filter_enable 2"
 
     if (board[0]) {
       throw new Error(
-        `${[...path, "0"].join(
-          "."
-        )}: Digit 0 is reserved for resetting the soundboard`
+        `${[...path, '0'].join('.')}: Digit 0 is reserved for resetting the soundboard`
       );
     }
 
     for (const digit of DIGITS) {
       const currentPath = [...path, digit];
-      const keyDigits = currentPath.join(".");
-      const digits = currentPath.join("");
+      const keyDigits = currentPath.join('.');
+      const digits = currentPath.join('');
       allDigits.push(digits);
       if (!(digit in board)) {
         alias(`+SSBsay_${digits}`, `SSBcout;`);
@@ -196,16 +204,15 @@ alias SSBendl "con_filter_enable 2"
       }
       const value = board[digit];
 
-      if (typeof value === "string") {
+      if (typeof value === 'string') {
         sound(value, currentPath);
-      } else if (value && typeof value === "object") {
-        const documentation = typeof value._ === "string" && value._;
+      } else if (value && typeof value === 'object') {
+        const documentation = typeof value._ === 'string' && value._;
         alias(
           `SSBhelp_${digits}`,
           echo(
             `[${digits}] ${
-              documentation ||
-              DIGITS.filter((d) => d in value).length + " lines"
+              documentation || DIGITS.filter((d) => d in value).length + ' lines'
             }`
           )
         );
@@ -227,9 +234,9 @@ alias SSBendl "con_filter_enable 2"
   }
 
   function sound(text, path) {
-    const digits = path.join("");
+    const digits = path.join('');
     const saycode = say(text);
-    const lineCount = saycode.join("").split(";wait").length;
+    const lineCount = saycode.join('').split(';wait').length;
     if (saycode.length === 1) {
       alias(`+SSBsay_${digits}`, saycode[0]);
     } else {
@@ -238,7 +245,7 @@ alias SSBendl "con_filter_enable 2"
           `ssbs_${digits}_${i}`,
           saycode[i] +
             // Call the next fn (if it will be defined)
-            `${i === saycode.length - 1 ? "" : `ssbs_${digits}_${i + 1}`}`
+            `${i === saycode.length - 1 ? '' : `ssbs_${digits}_${i + 1}`}`
         );
       }
       alias(`+SSBsay_${digits}`, `ssbs_${digits}_0`);
@@ -247,39 +254,68 @@ alias SSBendl "con_filter_enable 2"
     alias(
       `SSBhelp_${digits}`,
       echo(
-        `[${digits}]${
-          lineCount > 1 ? ` {${lineCount} lines}` : ""
-        } ${text.replace(/\n/g, " ")}`
+        `[${digits}]${lineCount > 1 ? ` {${lineCount} lines}` : ''} ${text.replace(
+          /\n/g,
+          ' '
+        )}`
       )
     );
   }
 
   function sanitizeLine(line) {
-    return line.trim().replace(/"/g, "''").replace(/;/g, "");
+    return (
+      line
+        .trim()
+        .replace(/  /g, ' ')
+        // There is no way to escape these characters in a .cfg
+        .replace(/"/g, "''")
+        // Terminates current command; we can't use quotes inside an alias so these have to be stripped
+        .replace(/;/g, '')
+        // '//' creates a comment, even inside a string
+        .replace(/\/\//g, '/ /')
+    );
   }
 
   function wrapCommand(command) {
     if (!command) return '""';
-    if (command[command.length - 1] === ";") {
+    // Remove trailing ;
+    if (command[command.length - 1] === ';') {
       command = command.substr(0, command.length - 1);
     }
-    if (command.includes(" ") || command.includes(";")) {
+    if (command.includes(' ') || command.includes(';')) {
       return '"' + command + '"';
     }
     return command;
   }
 }
 
+function panic(...args) {
+  console.error(...args);
+  process.exit(1);
+}
+
 async function main() {
-  const file = process.argv.slice(2).join(" ") || "soundboard.js";
-  const { default: json } = await import("./" + file);
-  try {
-    var output = soundboard(json);
-  } catch (e) {
-    console.error(e);
+  const file = path.resolve(process.argv.slice(2).join(' ') || 'soundboard.js');
+  console.log(`Using file: ${file}`);
+  const json = (await import(file).catch((e) => panic(`Could not open ${file}`, e)))
+    .default;
+
+  if (typeof json !== 'object') {
+    panic(`${file} did not export an object`);
   }
 
-  await fs.writeFile("./soundboard.cfg", output);
+  const skippedKeys = Object.keys(json).filter((key) => !TOP_LEVEL_KEYS.includes(key));
+  if (skippedKeys.length > 0) {
+    panic(`${file} contains the following unused keys: ${skippedKeys.join(', ')}`);
+  }
+
+  const output = soundboard(json);
+  const outputFile = path.format({ ...path.parse(file), base: undefined, ext: '.cfg' });
+  if (file === outputFile) {
+    panic(`Attempting to overwrite file ${file}, exiting`);
+  }
+  console.log(`Saving to: ${outputFile}`);
+  await fs.writeFile(outputFile, output);
 }
 
 main();

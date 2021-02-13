@@ -1,6 +1,21 @@
 {
-  "type": "module",
-  "scripts": {
-    "soundboard": "node ./index.js soundboard.js"
-  }
+  "name": "source-soundboard",
+  "version": "1.0.0",
+  "description": "Create Source engine .cfg files that say a message in chat (\"bind\") after entering their numeric code on your numpad",
+  "main": "index.js",
+  "bin": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/caresx/source-soundboard.git"
+  },
+  "keywords": [
+    "source-engine"
+  ],
+  "author": "Tycho Kaster",
+  "license": "GPL-3.0",
+  "bugs": {
+    "url": "https://github.com/caresx/source-soundboard/issues"
+  },
+  "homepage": "https://github.com/caresx/source-soundboard#readme",
+  "type": "module"
 }
