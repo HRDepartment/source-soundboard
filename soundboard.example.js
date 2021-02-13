@@ -1,7 +1,12 @@
 // .json format also works, but is more effort to type, and does not support comments
 module.exports = {
-  // Time to `wait` between lines whenever a text is multiline, in game ticks. Specifying a game's name will determine this value automatically.
-  wait: 'tf2',
+  // Time to `wait` between lines whenever a text is multiline.
+  // Formula: max(cl_cmdrate, currentfps) * seconds. `currentfps` can be limited by fps_max.
+  // In practice, unless you have a potato PC, `wait` will use your actual framerate. You should set your fps_max manually accordingly in your autoexec.
+  // In TF2, you need to wait 4 seconds between messages to not be rate limited by the server. In other games you might be able to get away with less.
+  // Your fps_max should be set to your monitor's refresh rate. If you have a 60Hz monitor, use fps_max 60.
+  // Example: (assuming fps_max 144, TF2)
+  wait: 144 * 4,
   1: {
     // This will be sent in chat when pressing 1 then 1 on the numpad.
     1: '11',

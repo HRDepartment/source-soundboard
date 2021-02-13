@@ -4,9 +4,6 @@ import path from 'path';
 
 // Maximum amount of chars per chat message (dictated by Source)
 const MAX_LINE_LENGTH = 127;
-// Wait duration in game ticks when `say`ing multiple lines
-const GAME_WAIT = { tf2: 250 };
-const GAME_WAIT_DEFAULT = 100;
 // Source has a command text length limit of 512
 const MAX_COMMANDS_PER_LINE = 3;
 const MAX_COMMAND_LENGTH = 512;
@@ -29,9 +26,7 @@ const DIGITS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 const TOP_LEVEL_KEYS = [...DIGITS.map(String), 'wait'];
 
 function soundboard(sb) {
-  const waitLengthNewline = GAME_WAIT.hasOwnProperty(sb.wait)
-    ? GAME_WAIT[sb.wait]
-    : Number.parseInt(sb.wait) || GAME_WAIT_DEFAULT;
+  let waitLengthNewline = typeof sb.wait == 'number' ? sb.wait : 100;
   const CONSOLE_PREFIX = '';
   let output = `developer 1
 con_filter_enable 2
