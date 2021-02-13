@@ -7,6 +7,7 @@ module.exports = {
   // Your fps_max should be set to your monitor's refresh rate. If you have a 60Hz monitor, use fps_max 60.
   // Example: (assuming fps_max 144, TF2)
   wait: 144 * 4,
+  // If your fps_max is 60, and you are playing TF2, you should use `66 * 4`, as 67 is the cmdrate of TF2, and it's greater than your fps_max.
   1: {
     // This will be sent in chat when pressing 1 then 1 on the numpad.
     1: '11',
