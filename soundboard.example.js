@@ -18,5 +18,16 @@ module.exports = {
       // 132. This message will be split across multiple lines (`say`s) that will be sent with a short delay using wait.
       2: `Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec eleifend eros in neque convallis tempus. Duis vestibulum consectetur ante nec euismod. Vestibulum et feugiat metus, sed suscipit nulla. Proin tincidunt interdum turpis, in accumsan arcu commodo in. Cras id augue ut massa posuere consectetur sit amet sed mi. Vestibulum nulla orci, tempus id turpis sed, tempus molestie ipsum. Proin sed pulvinar nisi. Mauris sollicitudin ante vel accumsan ultricies. Sed diam purus, accumsan et nisi fermentum, faucibus iaculis arcu. Aenean in enim leo. Aliquam erat volutpat. Etiam sagittis lectus eget elementum condimentum. Duis id nulla in nisi feugiat aliquet mattis et ante. Suspendisse eget eros vel elit vulputate tristique id quis est.`,
     },
+    4: say_team`This message will be shown in team chat`,
+    5: say_party`This message will be shown in party chat`,
+    // assert_1line is an alias for assert_lines(text, 1)
+    6: assert_lines(
+      `This text is only 1 line of ingame text, an error will be thrown otherwise`,
+      1
+    ),
+    // fill_line / fill_lines will repeat the text with a space added at the end (if it doesn't already exist) as many times as can fit in the requested number of lines (defaults to 1, you can omit it)
+    7: say_team(fill_line('F2' /*, 1*/)),
+    // emits:
+    // say_team "F2 F2 F2 F2 F2 F2 F2 F2 F2 F2 F2 F2 F2 F2 F2 F2 F2 F2 F2 F2 F2 F2 F2 F2 F2 F2 F2 F2 F2 F2 F2 F2 F2 F2 F2 F2 F2 F2 F2 F2 F2 F2"
   },
 };
