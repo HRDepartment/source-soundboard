@@ -3,5 +3,5 @@ package-lock.json
 .gitignore
 .editorconfig
 .eslintrc.json
-bench/
-test/
+tsconfig.json
+node_modules
