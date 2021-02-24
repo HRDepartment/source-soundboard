@@ -17,6 +17,7 @@ export const DIGIT_KEY_MAP = {
 // Press 0 to reset soundboard
 // Valid keys in the hierarchy of a soundboard file
 export const DIGITS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+export const DIGITS_INCLUDING_RESET = [...DIGITS, 0];
 // Valid top-level keys in a soundboard file
 export const LEGAL_TOP_LEVEL_KEYS = [
   ...DIGITS.map(String),

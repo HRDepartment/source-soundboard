@@ -1,6 +1,7 @@
 import path from 'path';
 import {
   DIGITS,
+  DIGITS_INCLUDING_RESET,
   DIGIT_KEY_MAP,
   MAX_COMMAND_LENGTH,
   MAX_LINE_LENGTH,
@@ -8,7 +9,7 @@ import {
 } from './consts.js';
 import { SayCommand } from './symbols.js';
 import crypto from 'crypto';
-
+``;
 function SSBcmd(name) {
   return `SSB${name}`;
 }
@@ -37,12 +38,12 @@ con_notifytime ${helpDuration}
     .update(JSON.stringify(sb))
     .digest('base64')
     .substr(0, 9)}%`;
+  alias(SSBcmd('reset'), bindDigits(DIGITS_INCLUDING_RESET).join(''));
+  alias(SSBcmd('lock'), bindDigits(DIGITS_INCLUDING_RESET, true).join(''));
   alias(SSBcmd('endl'), `con_filter_text ${gibberish};`);
+  alias(SSBcmd('locked'), echo(`Not currently locked`));
 
   traverse(sb);
-  alias(`SSBreset`, bindDigits(DIGITS).join(''));
-  // Resets current input and displays root options
-  appendcfg(bind(0, SSBcmd('0')));
   appendcfg(SSBcmd('reset'));
   appendcfg(SSBcmd('endl'));
 
@@ -68,10 +69,7 @@ con_notifytime ${helpDuration}
       allDigits.push(digits);
 
       if (!(digit in board)) {
-        alias(
-          SSBcmd(digits),
-          `${SSBcmd('reset')};${SSBcmd('cout')};echo [${digits}] unused;${SSBcmd('endl')}`
-        );
+        alias(SSBcmd(digits), `${SSBcmd('reset')};${echo(`[${digits}] unused`)}`);
         continue;
       }
 
@@ -79,15 +77,69 @@ con_notifytime ${helpDuration}
 
       // Either raw strings or values from global helper functions (which add symbols to a `new String`)
       if (typeof value === 'string' || value instanceof String) {
-        const saycode = say(value, waitLengthNewline);
-        const lineCount = saycode.reduce(
-          (count, line) => (line.startsWith('wait ') ? count + 1 : count),
-          1
-        );
+        const saycode = say(value);
+        const lineCount = saycode.length;
+        const lineCountDigits = Math.log10(lineCount);
         const cmd = SSBcmd(digits);
-        appendDigit(digits, saycode.join('\n'));
-        alias(`${cmd}`, exec(digits) + SSBcmd('reset'));
-        // alias(`-${cmd}`, reset());
+        const execCommand = [(lineCount === 1 ? SSBcmd('reset') : SSBcmd('lock')) + ';'];
+
+        // `wait` does not work in .cfgs, so we have to emit them in the alias. The following algorithm packs everything as tightly as possible
+        // in accordance with the source max line limit.
+        saycode.forEach((code, i) => {
+          const sayFile =
+            lineCount > 1
+              ? `${digits}p${String(i + 1).padStart(lineCountDigits, '0')}`
+              : digits;
+          if (lineCount > 1) {
+            if (i === lineCount - 1) {
+              code += `\nalias ${SSBcmd('locked')} "${echo(
+                'Not currently locked'
+              )}";\n${echo(`[${digits}] finished`)}\n`;
+            } else {
+              code += `\nalias ${SSBcmd('locked')} "${echo(
+                `[${digits}] playing ${i + 1} / ${lineCount}`
+              )}";\n`;
+            }
+          }
+          appendDigit(sayFile, code);
+          execCommand.push(exec(sayFile));
+        });
+
+        const execChunks = [''];
+        const maxCmdLength = MAX_COMMAND_LENGTH - 60; // Safe value to subtract for alias etc.
+        execCommand.forEach((command, i) => {
+          // [0] is the prefix command (reset/lock)
+          const hasNext = i !== 0 && execCommand.length - 1 !== i;
+          const fullCommand = hasNext ? `${command}wait ${waitLengthNewline};` : command;
+          const nextChunk = `${cmd}c${String(execChunks.length + 1).padStart(
+            lineCountDigits,
+            '0'
+          )}`;
+          // Need to be able to emit the nextChunk code at all times. If not, we create a new chunk.
+          const safeAppendLength =
+            execChunks[execChunks.length - 1].length +
+            fullCommand.length +
+            nextChunk.length;
+          if (safeAppendLength > maxCmdLength) {
+            execChunks[execChunks.length - 1] += nextChunk;
+            execChunks.push('');
+          }
+          execChunks[execChunks.length - 1] += fullCommand;
+        });
+
+        // Need to reset to remove the lock. This should be safe because of the liberal subtraction from MAX_COMMAND_LENGTH
+        if (lineCount > 1) {
+          execChunks[execChunks.length - 1] += SSBcmd('reset');
+        }
+
+        alias(cmd, execChunks[0]);
+        if (execChunks.length > 1) {
+          const chunkCountDigits = Math.log10(execChunks.length);
+          execChunks.slice(1).forEach((chunk, i) => {
+            alias(`${cmd}c${String(i + 2).padStart(chunkCountDigits, '0')}`, chunk);
+          });
+        }
+
         helpTexts[digits] = `[${digits}]${
           lineCount > 1 ? ` {${lineCount} lines}` : ''
         } ${value.replace(/\n/g, ' ')}`;
@@ -124,9 +176,13 @@ con_notifytime ${helpDuration}
   function appendDigit(digit, data) {
     const filename = `${digit}.cfg`;
     if (!files.lines[filename]) {
-      files.lines[filename] = `// Generated by source-soundboard\n`;
+      files.lines[filename] = ``;
     }
     files.lines[filename] += `${data}\n`;
+  }
+
+  function echo(text) {
+    return `${SSBcmd('cout')};echo ${text};${SSBcmd('endl')}`;
   }
 
   function exec(digit) {
@@ -161,32 +217,37 @@ con_notifytime ${helpDuration}
   }
 
   function alias(token, command) {
-    if (command.length > MAX_COMMAND_LENGTH) {
-      throw new Error(`Line ${command} exceeds Source's max command length`);
+    const line = `alias ${token} ${wrapCommand(command)}`;
+    if (line.length > MAX_COMMAND_LENGTH) {
+      throw new Error(`Line ${line} exceeds Source's max command length`);
     }
-    appendcfg(`alias ${token} ${wrapCommand(command)}`);
+    appendcfg(line);
   }
 
   /**
    * @param {string} command Must be a single command (use an alias if you need multiple commands)
    */
   function bind(key, command) {
-    if (command.length > MAX_COMMAND_LENGTH) {
-      throw new Error(`Line ${command} exceeds Source's max command length`);
+    const line = `bind ${DIGIT_KEY_MAP[key]} ${command};`;
+    if (line.length > MAX_COMMAND_LENGTH) {
+      throw new Error(`Line ${line} exceeds Source's max command length`);
     }
-    return `bind ${DIGIT_KEY_MAP[key]} ${command};`;
+    return line;
   }
 
-  function bindDigits(pathDigits) {
+  function bindDigits(pathDigits, lock = false) {
     return pathDigits.map((pathDigit) => {
       const digits = String(pathDigit);
-      return bind(digits.substr(digits.length - 1), `${SSBcmd(digits)}`);
+      return bind(
+        digits.substr(digits.length - 1),
+        lock ? SSBcmd(`locked`) : SSBcmd(digits)
+      );
     });
   }
 }
 
 // line can be a string or new String
-function say(line, waitLengthNewline) {
+function say(line) {
   const text = sanitizeLine(line);
   const message = [];
   const words = text.split(' ');
@@ -235,10 +296,6 @@ function say(line, waitLengthNewline) {
     }
 
     message.push(`${sayCommand} "${lineWords}";`);
-    // wait if there is another line coming
-    if (words.length - i > 1) {
-      message.push(`wait ${waitLengthNewline};`);
-    }
   }
 
   return message;
